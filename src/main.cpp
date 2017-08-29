@@ -1134,7 +1134,7 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos)
     }
 
     // Check the header
-    if (!CheckBlockProofOfWork(&block, chainActive.Tip()->nHeight))
+    if (!CheckBlockProofOfWork(&block, chainActive.Tip()))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
     return true;
@@ -1912,7 +1912,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
 			if (pindex->nVersion > CBlock::CURRENT_VERSION &&
-				(pindex->nVersion & ~BLOCK_VERSION_AUXPOW) != (CBlockHeader::CURRENT_VERSION | ((chainActive.Tip()->nHeight >= 825000 ? AUXPOW_CHAIN_ID_FORK : AUXPOW_CHAIN_ID) * BLOCK_VERSION_CHAIN_START)))
+				(pindex->nVersion & ~BLOCK_VERSION_AUXPOW) != (CBlockHeader::CURRENT_VERSION | ((IsSuperMajority(4, pindexPrev, Params().RejectBlockOutdatedMajority()) ? AUXPOW_CHAIN_ID_FORK : AUXPOW_CHAIN_ID) * BLOCK_VERSION_CHAIN_START)))
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
@@ -2442,7 +2442,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW)
 {
     // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckBlockProofOfWork(&block, chainActive.Tip()->nHeight))
+    if (fCheckPOW && !CheckBlockProofOfWork(&block, chainActive.Tip()))
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
                          REJECT_INVALID, "high-hash");
 
@@ -2561,6 +2561,14 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
         return state.Invalid(error("%s : rejected nVersion=2 block", __func__),
                              REJECT_OBSOLETE, "bad-version");
     }
+
+        // Reject block.nVersion=3 blocks when 95% (75% on testnet) of the network has upgraded:
+    if (block.nVersion < 4 && IsSuperMajority(4, pindexPrev, Params().RejectBlockOutdatedMajority()))
+    {
+        return state.Invalid(error("%s : rejected nVersion=2 block", __func__),
+                             REJECT_OBSOLETE, "bad-version");
+    }
+
     return true;
 }
 
