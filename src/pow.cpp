@@ -203,34 +203,39 @@ uint256 GetBlockProof(const CBlockIndex& block)
     return (~bnTarget / (bnTarget + 1)) + 1;
 }
 
-bool CheckBlockProofOfWork(const CBlockHeader *pblock, CBlockIndex *pindexPrev)
+bool CheckBlockProofOfWork(const CBlockHeader *pblock)
 {
-	// There's an issue with blocks prior to the auxpow fork reporting an invalid chain ID.
-	// As no version earlier than the 0.10 client a) has version 3 blocks and b) 
-	//	has auxpow, anything that isn't a version 3 block can be checked normally.
-	//	There's probably a more elegant way to implement this.
+    // There's an issue with blocks prior to the auxpow fork reporting an invalid chain ID.
+    // As no version earlier than the 0.10 client a) has version 3 blocks and b) 
+    //	has auxpow, anything that isn't a version 3 block can be checked normally.
+    // There's probably a more elegant way to implement this.
+    int chainID = 0;
+    if (pblock->nVersion >= 5)
+        chainID = AUXPOW_CHAIN_ID_FORK;
+    else
+        chainID = AUXPOW_CHAIN_ID;
 
-	if (pblock->nVersion > 2) {
-       LogPrintf("nVersion : %d, ChainID : %d, %d\n",pblock->nVersion,pblock->GetChainID(),(IsSuperMajority(4, pindexPrev, Params().RejectBlockOutdatedMajority()) ? AUXPOW_CHAIN_ID_FORK : AUXPOW_CHAIN_ID));
+    if (pblock->nVersion > 2) {
+        LogPrintf("nVersion : %d, ChainID : %d, %d\n",pblock->nVersion,pblock->GetChainID(),chainID);
 
-       if (!Params().AllowMinDifficultyBlocks() && (pblock->nVersion & BLOCK_VERSION_AUXPOW && pblock->GetChainID() != (IsSuperMajority(4, pindexPrev, Params().RejectBlockOutdatedMajority()) ? AUXPOW_CHAIN_ID_FORK : AUXPOW_CHAIN_ID)))
-	        return error("CheckBlockProofOfWork() : block does not have our chain ID");	
+        if (!Params().AllowMinDifficultyBlocks() && (pblock->nVersion & BLOCK_VERSION_AUXPOW && pblock->GetChainID() != chainID))
+            return error("CheckBlockProofOfWork() : block does not have our chain ID");	
 
-	    if (pblock->auxpow.get() != NULL)
-	    {
-	        if (!pblock->auxpow->Check(pblock->GetHash(), pblock->GetChainID()))
-	            return error("CheckBlockProofOfWork() : AUX POW is not valid");
-	        // Check proof of work matches claimed amount
-	        if (!CheckProofOfWork(pblock->auxpow->GetParentBlockHash(), pblock->nBits))
-	            return error("CheckBlockProofOfWork() : AUX proof of work failed");
-	    } 
-	    else
-	    {
-	        // Check proof of work matches claimed amount
-	        if (!CheckProofOfWork(pblock->GetHash(), pblock->nBits))
-	            return error("CheckBlockProofOfWork() : proof of work failed");
-	    }
-	}
+        if (pblock->auxpow.get() != NULL)
+        {
+            if (!pblock->auxpow->Check(pblock->GetHash(), pblock->GetChainID()))
+                return error("CheckBlockProofOfWork() : AUX POW is not valid");
+            // Check proof of work matches claimed amount
+            if (!CheckProofOfWork(pblock->auxpow->GetParentBlockHash(), pblock->nBits))
+                return error("CheckBlockProofOfWork() : AUX proof of work failed");
+        } 
+        else
+        {
+            // Check proof of work matches claimed amount
+            if (!CheckProofOfWork(pblock->GetHash(), pblock->nBits))
+                return error("CheckBlockProofOfWork() : proof of work failed");
+        }
+    }
     else
     {
         // Check proof of work matches claimed amount

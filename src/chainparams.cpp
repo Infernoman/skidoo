@@ -108,12 +108,12 @@ public:
         nSubsidyHalvingInterval = 1000000;
 
 
-        nEnforceBlockUpgradeMajority = 75000000;
-        nRejectBlockOutdatedMajority = 95000000;
-        nToCheckBlockUpgradeMajority = 10000000;
+        nEnforceBlockUpgradeMajority = 750;
+        nRejectBlockOutdatedMajority = 950;
+        nToCheckBlockUpgradeMajority = 1000;
         nMinerThreads = 0;
-		nTargetTimespan = 2.3 * 60 * 25;
-		nTargetSpacing = 2.3 * 60; 
+	nTargetTimespan = 2.3 * 60 * 25;
+	nTargetSpacing = 2.3 * 60; 
 
         const char* pszTimestamp = "In thanks to Saint Jude for favors granted. A.W.";
         CMutableTransaction txNew;

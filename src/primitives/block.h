@@ -44,7 +44,7 @@ class CBlockHeader
 {
 public:
     // header
-    static const int32_t CURRENT_VERSION=4;
+    static const int32_t CURRENT_VERSION=5;
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -74,7 +74,7 @@ public:
 
     void SetNull()
     {
-        nVersion = CBlockHeader::CURRENT_VERSION | (AUXPOW_CHAIN_ID * BLOCK_VERSION_CHAIN_START);
+        nVersion = CBlockHeader::CURRENT_VERSION | (AUXPOW_CHAIN_ID_FORK * BLOCK_VERSION_CHAIN_START);
         hashPrevBlock.SetNull();
         hashMerkleRoot.SetNull();
         nTime = 0;

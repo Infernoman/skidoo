@@ -69,6 +69,14 @@ map<uint256, COrphanTx> mapOrphanTransactions;
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
 void EraseOrphansFor(NodeId peer);
 
+/**
+ * Returns true if there are nRequired or more blocks of minVersion or above
+ * in the last Params().ToCheckBlockUpgradeMajority() blocks, starting at pstart 
+ * and going backwards.
+ */
+static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned int nRequired);
+
+
 /** Constant stuff for coinbase transactions we create: */
 CScript COINBASE_FLAGS;
 
@@ -1127,7 +1135,7 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos)
     }
 
     // Check the header
-    if (!CheckBlockProofOfWork(&block, chainActive.Tip()))
+    if (!CheckBlockProofOfWork(&block))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
     return true;
@@ -1901,16 +1909,21 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     if (!IsInitialBlockDownload() && !fWarned)
     {
         int nUpgraded = 0;
+        int chainID = 0;
         const CBlockIndex* pindex = chainActive.Tip();
+        if (pindex->nVersion >= 5)
+            chainID = AUXPOW_CHAIN_ID_FORK;
+        else
+            chainID = AUXPOW_CHAIN_ID;
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
 			if (pindex->nVersion > CBlock::CURRENT_VERSION &&
-				(pindex->nVersion & ~BLOCK_VERSION_AUXPOW) != (CBlockHeader::CURRENT_VERSION | ((IsSuperMajority(4, chainActive.Tip(), Params().RejectBlockOutdatedMajority()) ? AUXPOW_CHAIN_ID_FORK : AUXPOW_CHAIN_ID) * BLOCK_VERSION_CHAIN_START)))
+				(pindex->nVersion & ~BLOCK_VERSION_AUXPOW) != (CBlockHeader::CURRENT_VERSION | (chainID * BLOCK_VERSION_CHAIN_START)))
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            LogPrintf("SetBestChain: %d of last 100 blocks above version %d\n", nUpgraded, (int)CBlock::CURRENT_VERSION);
+            LogPrintf("SetBestChain: %d of last 100 blocks were version %d which is above version %d\n", nUpgraded, (int)pindex->nVersion, (int)CBlock::CURRENT_VERSION);
         if (nUpgraded > 100/2)
         {
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
@@ -2435,7 +2448,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW)
 {
     // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckBlockProofOfWork(&block, chainActive.Tip()))
+    if (fCheckPOW && !CheckBlockProofOfWork(&block))
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
                          REJECT_INVALID, "high-hash");
 
@@ -2557,6 +2570,13 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
 
         // Reject block.nVersion=3 blocks when 95% (75% on testnet) of the network has upgraded:
     if (block.nVersion < 4 && IsSuperMajority(4, pindexPrev, Params().RejectBlockOutdatedMajority()))
+    {
+        return state.Invalid(error("%s : rejected nVersion=2 block", __func__),
+                             REJECT_OBSOLETE, "bad-version");
+    }
+
+        // Reject block.nVersion=3 blocks when 95% (75% on testnet) of the network has upgraded:
+    if (block.nVersion < 5 && IsSuperMajority(5, pindexPrev, Params().RejectBlockOutdatedMajority()))
     {
         return state.Invalid(error("%s : rejected nVersion=2 block", __func__),
                              REJECT_OBSOLETE, "bad-version");
